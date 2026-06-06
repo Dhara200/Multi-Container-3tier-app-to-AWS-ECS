@@ -1,4 +1,4 @@
-name: Build Scan Push Deploy ECS
+name: Build Scan Push ECR
 
 on:
   push:
@@ -9,7 +9,7 @@ env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
 
 jobs:
-  deploy:
+  build-scan-push:
 
     runs-on: ubuntu-latest
 
@@ -17,6 +17,15 @@ jobs:
 
     - name: Checkout Source
       uses: actions/checkout@v4
+
+    - name: Show Repository Structure
+      run: |
+        pwd
+        ls -la
+        ls -la Backend
+        ls -la Frontend
+        ls -la Nginx
+        ls -la Mysql
 
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
@@ -35,24 +44,22 @@ jobs:
 
     - name: Build Backend Image
       run: |
-        docker build \
-          -t backend:${{ github.sha }} \
-          ./backend
+        docker build -t backend:${{ github.sha }} ./Backend
 
     - name: Build Frontend Image
       run: |
-        docker build \
-          -t frontend:${{ github.sha }} \
-          ./frontend
+        docker build -t frontend:${{ github.sha }} ./Frontend
 
     - name: Build Nginx Image
       run: |
-        docker build \
-          -t nginx:${{ github.sha }} \
-          ./nginx
+        docker build -t nginx:${{ github.sha }} ./Nginx
+
+    - name: Build Mysql Image
+      run: |
+        docker build -t mysql:${{ github.sha }} ./Mysql
 
     ####################################################
-    # TRIVY SCAN BACKEND
+    # BACKEND TRIVY
     ####################################################
 
     - name: Backend Trivy Report
@@ -70,17 +77,8 @@ jobs:
         name: backend-trivy-report
         path: backend-trivy-report.txt
 
-    - name: Backend Vulnerability Gate
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: backend:${{ github.sha }}
-        format: table
-        exit-code: '1'
-        severity: HIGH,CRITICAL
-        ignore-unfixed: true
-
     ####################################################
-    # TRIVY SCAN FRONTEND
+    # FRONTEND TRIVY
     ####################################################
 
     - name: Frontend Trivy Report
@@ -98,17 +96,8 @@ jobs:
         name: frontend-trivy-report
         path: frontend-trivy-report.txt
 
-    - name: Frontend Vulnerability Gate
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: frontend:${{ github.sha }}
-        format: table
-        exit-code: '1'
-        severity: HIGH,CRITICAL
-        ignore-unfixed: true
-
     ####################################################
-    # TRIVY SCAN NGINX
+    # NGINX TRIVY
     ####################################################
 
     - name: Nginx Trivy Report
@@ -126,10 +115,60 @@ jobs:
         name: nginx-trivy-report
         path: nginx-trivy-report.txt
 
+    ####################################################
+    # MYSQL TRIVY
+    ####################################################
+
+    - name: Mysql Trivy Report
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: mysql:${{ github.sha }}
+        format: table
+        output: mysql-trivy-report.txt
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+
+    - name: Upload Mysql Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: mysql-trivy-report
+        path: mysql-trivy-report.txt
+
+    ####################################################
+    # VULNERABILITY GATES
+    ####################################################
+
+    - name: Backend Vulnerability Gate
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: backend:${{ github.sha }}
+        format: table
+        exit-code: '1'
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+
+    - name: Frontend Vulnerability Gate
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: frontend:${{ github.sha }}
+        format: table
+        exit-code: '1'
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+
     - name: Nginx Vulnerability Gate
       uses: aquasecurity/trivy-action@master
       with:
         image-ref: nginx:${{ github.sha }}
+        format: table
+        exit-code: '1'
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+
+    - name: Mysql Vulnerability Gate
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: mysql:${{ github.sha }}
         format: table
         exit-code: '1'
         severity: HIGH,CRITICAL
@@ -154,42 +193,31 @@ jobs:
         docker tag nginx:${{ github.sha }} \
         ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
 
+    - name: Tag Mysql
+      run: |
+        docker tag mysql:${{ github.sha }} \
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:${{ github.sha }}
+
     ####################################################
     # PUSH TO ECR
     ####################################################
 
     - name: Push Backend
       run: |
-        docker push \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
+        docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
 
     - name: Push Frontend
       run: |
-        docker push \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:${{ github.sha }}
+        docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:${{ github.sha }}
 
     - name: Push Nginx
       run: |
-        docker push \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
+        docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
 
-    ####################################################
-    # ECS DEPLOY
-    ####################################################
-
-    - name: Trigger ECS Deployment
+    - name: Push Mysql
       run: |
-        aws ecs update-service \
-          --cluster ${{ secrets.ECS_CLUSTER }} \
-          --service ${{ secrets.ECS_SERVICE }} \
-          --force-new-deployment
+        docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:${{ github.sha }}
 
-    - name: Wait For ECS Stability
+    - name: Success
       run: |
-        aws ecs wait services-stable \
-          --cluster ${{ secrets.ECS_CLUSTER }} \
-          --services ${{ secrets.ECS_SERVICE }}
-
-    - name: Deployment Complete
-      run: |
-        echo "Deployment Successful"
+        echo "All images scanned and pushed successfully"
