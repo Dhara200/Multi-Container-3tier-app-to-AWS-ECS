@@ -5,8 +5,6 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: waste_db
-    volumes:
-      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -24,13 +22,9 @@ services:
       mysql:
         condition: service_healthy
 
-  frontend:
-    build: ./Frontend
-
   nginx:
     build: ./Nginx
     ports:
       - "80:80"
     depends_on:
-      - frontend
       - backend
