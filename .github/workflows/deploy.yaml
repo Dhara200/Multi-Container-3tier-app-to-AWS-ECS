@@ -142,22 +142,22 @@ jobs:
     - name: Tag Backend Latest
       run: |
         docker tag backend:${{ github.sha }} \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:latest
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
 
     - name: Tag Frontend Latest
       run: |
         docker tag frontend:${{ github.sha }} \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:latest
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:${{ github.sha }}
 
     - name: Tag Nginx Latest
       run: |
         docker tag nginx:${{ github.sha }} \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:latest
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}${{ github.sha }}
 
     - name: Tag Mysql Latest
       run: |
         docker tag mysql:${{ github.sha }} \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:latest
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:${{ github.sha }}
 
     ####################################################
     # PUSH TO ECR
@@ -166,23 +166,50 @@ jobs:
     - name: Push Backend Latest
       run: |
         docker push \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:latest
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
 
     - name: Push Frontend Latest
       run: |
         docker push \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:latest
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:${{ github.sha }}
 
     - name: Push Nginx Latest
       run: |
         docker push \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:latest
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
 
     - name: Push Mysql Latest
       run: |
         docker push \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:latest
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:${{ github.sha }}
 
     - name: Success
       run: |
         echo "All images scanned and pushed successfully"
+
+####################################################
+    # ECS DEPLOY (NEW PART)
+    ####################################################
+
+    - name: Render ECS Task Definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-definition.json
+        container-name: backend
+        image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
+
+    - name: Deploy to ECS Service
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
+
+    ####################################################
+    # SUCCESS
+    ####################################################
+
+    - name: Success
+      run: echo "Build → Scan → Push → ECS Deploy completed successfully"    
