@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Smart Waste Management</title>
+</head>
+
+<body>
+
+<h1>Waste Request Portal</h1>
+
+<input id="location" placeholder="Location">
+
+<input id="type" placeholder="Waste Type">
+
+<button onclick="submitRequest()">
+Submit
+</button>
+
+<h2>Requests</h2>
+
+<button onclick="loadRequests()">
+Load Requests
+</button>
+
+<div id="results"></div>
+
+<script>
+
+async function submitRequest() {
+
+    await fetch(
+        "http://localhost:5000/request",
+        {
+            method: "POST",
+            headers: {
+                "Content-Type":"application/json"
+            },
+            body: JSON.stringify({
+                user_id:1,
+                location:
+                    document.getElementById("location").value,
+                waste_type:
+                    document.getElementById("type").value
+            })
+        }
+    );
+
+    alert("Request Submitted");
+}
+
+async function loadRequests() {
+
+    let response =
+        await fetch(
+            "http://localhost:5000/requests"
+        );
+
+    let data =
+        await response.json();
+
+    document.getElementById("results")
+        .innerHTML =
+        JSON.stringify(data,null,2);
+}
+
+</script>
+
+</body>
+</html>

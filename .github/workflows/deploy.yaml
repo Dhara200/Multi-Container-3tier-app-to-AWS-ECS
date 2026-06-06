@@ -1,0 +1,195 @@
+name: Build Scan Push Deploy ECS
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+
+jobs:
+  deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout Source
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    ####################################################
+    # BUILD IMAGES
+    ####################################################
+
+    - name: Build Backend Image
+      run: |
+        docker build \
+          -t backend:${{ github.sha }} \
+          ./backend
+
+    - name: Build Frontend Image
+      run: |
+        docker build \
+          -t frontend:${{ github.sha }} \
+          ./frontend
+
+    - name: Build Nginx Image
+      run: |
+        docker build \
+          -t nginx:${{ github.sha }} \
+          ./nginx
+
+    ####################################################
+    # TRIVY SCAN BACKEND
+    ####################################################
+
+    - name: Backend Trivy Report
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: backend:${{ github.sha }}
+        format: table
+        output: backend-trivy-report.txt
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+
+    - name: Upload Backend Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-trivy-report
+        path: backend-trivy-report.txt
+
+    - name: Backend Vulnerability Gate
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: backend:${{ github.sha }}
+        format: table
+        exit-code: '1'
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+
+    ####################################################
+    # TRIVY SCAN FRONTEND
+    ####################################################
+
+    - name: Frontend Trivy Report
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: frontend:${{ github.sha }}
+        format: table
+        output: frontend-trivy-report.txt
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+
+    - name: Upload Frontend Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-trivy-report
+        path: frontend-trivy-report.txt
+
+    - name: Frontend Vulnerability Gate
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: frontend:${{ github.sha }}
+        format: table
+        exit-code: '1'
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+
+    ####################################################
+    # TRIVY SCAN NGINX
+    ####################################################
+
+    - name: Nginx Trivy Report
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: nginx:${{ github.sha }}
+        format: table
+        output: nginx-trivy-report.txt
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+
+    - name: Upload Nginx Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: nginx-trivy-report
+        path: nginx-trivy-report.txt
+
+    - name: Nginx Vulnerability Gate
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: nginx:${{ github.sha }}
+        format: table
+        exit-code: '1'
+        severity: HIGH,CRITICAL
+        ignore-unfixed: true
+
+    ####################################################
+    # TAG IMAGES
+    ####################################################
+
+    - name: Tag Backend
+      run: |
+        docker tag backend:${{ github.sha }} \
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
+
+    - name: Tag Frontend
+      run: |
+        docker tag frontend:${{ github.sha }} \
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:${{ github.sha }}
+
+    - name: Tag Nginx
+      run: |
+        docker tag nginx:${{ github.sha }} \
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
+
+    ####################################################
+    # PUSH TO ECR
+    ####################################################
+
+    - name: Push Backend
+      run: |
+        docker push \
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
+
+    - name: Push Frontend
+      run: |
+        docker push \
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:${{ github.sha }}
+
+    - name: Push Nginx
+      run: |
+        docker push \
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
+
+    ####################################################
+    # ECS DEPLOY
+    ####################################################
+
+    - name: Trigger ECS Deployment
+      run: |
+        aws ecs update-service \
+          --cluster ${{ secrets.ECS_CLUSTER }} \
+          --service ${{ secrets.ECS_SERVICE }} \
+          --force-new-deployment
+
+    - name: Wait For ECS Stability
+      run: |
+        aws ecs wait services-stable \
+          --cluster ${{ secrets.ECS_CLUSTER }} \
+          --services ${{ secrets.ECS_SERVICE }}
+
+    - name: Deployment Complete
+      run: |
+        echo "Deployment Successful"
