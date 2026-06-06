@@ -187,30 +187,64 @@ jobs:
       run: |
         echo "All images scanned and pushed successfully"
 
-####################################################
-    # ECS DEPLOY (NEW PART)
     ####################################################
-
-    - name: Trigger ECS Deployment
+    # GET TASK DEFINITION FROM ECS
+    ####################################################
+    - name: Get Task Definition from ECS
       run: |
-        aws ecs update-service \
-          --cluster ${{ secrets.ECS_CLUSTER }} \
-          --service ${{ secrets.ECS_SERVICE }} \
-          --force-new-deployment
+        aws ecs describe-task-definition \
+          --task-definition ${{ secrets.ECS_TASK_DEFINITION }} \
+          --query taskDefinition \
+          --output json > task-def.json
 
-    - name: Wait For ECS Stability
-      run: |
-        aws ecs wait services-stable \
-          --cluster ${{ secrets.ECS_CLUSTER }} \
-          --services ${{ secrets.ECS_SERVICE }}
+    ####################################################
+    # UPDATE ALL CONTAINERS IN TASK DEFINITION
+    ####################################################
+    - name: Render Backend
+      id: backend
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-def.json
+        container-name: backend
+        image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
 
-    - name: Deployment Complete
-      run: |
-        echo "Deployment Successful"
+    - name: Render Frontend
+      id: frontend
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: ${{ steps.backend.outputs.task-definition }}
+        container-name: frontend
+        image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:${{ github.sha }}
+
+    - name: Render Nginx
+      id: nginx
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: ${{ steps.frontend.outputs.task-definition }}
+        container-name: nginx
+        image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
+
+    - name: Render Mysql
+      id: mysql
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: ${{ steps.nginx.outputs.task-definition }}
+        container-name: mysql
+        image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:${{ github.sha }}
+
+    ####################################################
+    # DEPLOY TO ECS
+    ####################################################
+    - name: Deploy to ECS
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      with:
+        task-definition: ${{ steps.mysql.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
 
     ####################################################
     # SUCCESS
     ####################################################
-
-    - name: Success
-      run: echo "Build → Scan → Push → ECS Deploy completed successfully"    
+    - name: Success Message
+      run: echo "🚀 ECS Deployment Completed Successfully"
