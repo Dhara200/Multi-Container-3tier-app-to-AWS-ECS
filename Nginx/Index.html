@@ -2,37 +2,218 @@
 <html>
 <head>
     <title>Smart Waste Management</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #eef2f7;
+            margin: 0;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 900px;
+            margin: 20px auto;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 6px 0;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            border: none;
+            cursor: pointer;
+            border-radius: 6px;
+        }
+
+        .submit { background: green; color: white; }
+        .load { background: blue; color: white; }
+
+        .card {
+            background: #fff;
+            padding: 10px;
+            margin-top: 10px;
+            border-left: 4px solid green;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        .admin-box {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        .stat {
+            background: #f7f9fc;
+            padding: 10px;
+            border-radius: 8px;
+            width: 30%;
+            text-align: center;
+        }
+
+        .tabs {
+            display: flex;
+            margin-top: 20px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 10px;
+            cursor: pointer;
+            text-align: center;
+            background: #ddd;
+        }
+
+        .tab.active {
+            background: #2c3e50;
+            color: white;
+        }
+    </style>
 </head>
+
 <body>
-    <h1>Waste Request Portal</h1>
+
+<div class="container">
+
+    <h1>♻ Smart Waste Management</h1>
+
+    <!-- USER SECTION -->
+    <h2>User Panel</h2>
+
     <input id="location" placeholder="Location">
     <input id="type" placeholder="Waste Type">
-    <button onclick="submitRequest()">Submit</button>
 
-    <h2>Requests</h2>
-    <button onclick="loadRequests()">Load Requests</button>
+    <button class="submit" onclick="submitRequest(this)">
+        Submit Request
+    </button>
+
+    <button class="load" onclick="loadRequests()">
+        Load Requests
+    </button>
+
+    <!-- ADMIN SECTION -->
+    <h2>👨‍💼 Admin Panel</h2>
+
+    <div class="tabs">
+        <div class="tab active" onclick="filter('all')">All</div>
+        <div class="tab" onclick="filter('Pending')">Pending</div>
+        <div class="tab" onclick="filter('Approved')">Approved</div>
+    </div>
+
+    <div class="admin-box">
+        <div class="stat">
+            <h3 id="total">0</h3>
+            <p>Total</p>
+        </div>
+        <div class="stat">
+            <h3 id="pending">0</h3>
+            <p>Pending</p>
+        </div>
+        <div class="stat">
+            <h3 id="approved">0</h3>
+            <p>Approved</p>
+        </div>
+    </div>
+
     <div id="results"></div>
 
-    <script>
-        async function submitRequest() {
-            await fetch("/api/request", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    user_id: 1,
-                    location: document.getElementById("location").value,
-                    waste_type: document.getElementById("type").value
-                })
-            });
-            alert("Request Submitted");
-        }
+</div>
 
-        async function loadRequests() {
-            let response = await fetch("/api/requests");
-            let data = await response.json();
-            document.getElementById("results").innerText =
-                JSON.stringify(data, null, 2);
-        }
-    </script>
+<script>
+
+let allData = [];
+let currentFilter = "all";
+
+async function submitRequest(btn) {
+
+    btn.disabled = true;
+    btn.innerText = "Submitting...";
+
+    await fetch("/api/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            user_id: 1,
+            location: document.getElementById("location").value,
+            waste_type: document.getElementById("type").value
+        })
+    });
+
+    btn.disabled = false;
+    btn.innerText = "Submit Request";
+
+    alert("Request Submitted");
+
+    loadRequests();
+}
+
+async function loadRequests() {
+
+    let response = await fetch("/api/requests");
+    allData = await response.json();
+
+    updateStats();
+    render();
+}
+
+function updateStats() {
+
+    document.getElementById("total").innerText = allData.length;
+
+    let pending = allData.filter(r => r.status === "Pending").length;
+    let approved = allData.filter(r => r.status === "Approved").length;
+
+    document.getElementById("pending").innerText = pending;
+    document.getElementById("approved").innerText = approved;
+}
+
+function render() {
+
+    let data = allData;
+
+    if (currentFilter !== "all") {
+        data = allData.filter(r => r.status === currentFilter);
+    }
+
+    let html = "";
+
+    data.forEach(r => {
+        html += `
+            <div class="card">
+                <b>ID:</b> ${r.id} <br>
+                <b>Location:</b> ${r.location} <br>
+                <b>Type:</b> ${r.waste_type} <br>
+                <b>Status:</b> ${r.status}
+            </div>
+        `;
+    });
+
+    document.getElementById("results").innerHTML = html;
+}
+
+function filter(type) {
+
+    currentFilter = type;
+
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    event.target.classList.add("active");
+
+    render();
+}
+
+</script>
+
 </body>
 </html>
