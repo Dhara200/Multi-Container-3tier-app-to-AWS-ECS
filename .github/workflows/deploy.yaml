@@ -136,48 +136,52 @@ jobs:
 
  
     ####################################################
-    # TAG IMAGES
+    # TAG IMAGES AS LATEST
     ####################################################
 
-    - name: Tag Backend
+    - name: Tag Backend Latest
       run: |
         docker tag backend:${{ github.sha }} \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:latest
 
-    - name: Tag Frontend
+    - name: Tag Frontend Latest
       run: |
         docker tag frontend:${{ github.sha }} \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:${{ github.sha }}
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:latest
 
-    - name: Tag Nginx
+    - name: Tag Nginx Latest
       run: |
         docker tag nginx:${{ github.sha }} \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:latest
 
-    - name: Tag Mysql
+    - name: Tag Mysql Latest
       run: |
         docker tag mysql:${{ github.sha }} \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:${{ github.sha }}
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:latest
 
     ####################################################
     # PUSH TO ECR
     ####################################################
 
-    - name: Push Backend
+    - name: Push Backend Latest
       run: |
-        docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
+        docker push \
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:latest
 
-    - name: Push Frontend
+    - name: Push Frontend Latest
       run: |
-        docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:${{ github.sha }}
+        docker push \
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:latest
 
-    - name: Push Nginx
+    - name: Push Nginx Latest
       run: |
-        docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
+        docker push \
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:latest
 
-    - name: Push Mysql
+    - name: Push Mysql Latest
       run: |
-        docker push ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:${{ github.sha }}
+        docker push \
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:latest
 
     - name: Success
       run: |
