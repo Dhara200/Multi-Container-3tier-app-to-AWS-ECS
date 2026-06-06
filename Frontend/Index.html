@@ -1,3 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Smart Waste Management</title>
+</head>
+
+<body>
+
+<h1>Waste Request Portal</h1>
+
+<input id="location" placeholder="Location">
+
+<input id="type" placeholder="Waste Type">
+
+<button onclick="submitRequest()">
+Submit
+</button>
+
+<h2>Requests</h2>
+
+<button onclick="loadRequests()">
+Load Requests
+</button>
+
+<div id="results"></div>
 <script>
 
 async function submitRequest() {
