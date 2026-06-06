@@ -24,15 +24,15 @@ services:
       - mysql
 
   frontend:
-    build: ./frontend
+    build: ./Frontend
 
   nginx:
 
-    build: ./nginx
+    build: ./Nginx
 
     ports:
       - "80:80"
 
     depends_on:
-      - frontend
-      - backend
+      - Frontend
+      - Backend
