@@ -152,7 +152,7 @@ jobs:
     - name: Tag Nginx Latest
       run: |
         docker tag nginx:${{ github.sha }} \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}${{ github.sha }}
+        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
 
     - name: Tag Mysql Latest
       run: |
