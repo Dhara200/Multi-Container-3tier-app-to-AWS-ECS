@@ -30,7 +30,7 @@ Load Requests
 async function submitRequest() {
 
     await fetch(
-        "http://localhost:5000/request",
+        "/api/submit",
         {
             method: "POST",
             headers: {
@@ -53,7 +53,7 @@ async function loadRequests() {
 
     let response =
         await fetch(
-            "http://localhost:5000/requests"
+            "/api/submit"
         );
 
     let data =
