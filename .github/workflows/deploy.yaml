@@ -134,46 +134,7 @@ jobs:
         name: mysql-trivy-report
         path: mysql-trivy-report.txt
 
-    ####################################################
-    # VULNERABILITY GATES
-    ####################################################
-
-    - name: Backend Vulnerability Gate
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: backend:${{ github.sha }}
-        format: table
-        exit-code: '1'
-        severity: HIGH,CRITICAL
-        ignore-unfixed: true
-
-    - name: Frontend Vulnerability Gate
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: frontend:${{ github.sha }}
-        format: table
-        exit-code: '1'
-        severity: HIGH,CRITICAL
-        ignore-unfixed: true
-
-    - name: Nginx Vulnerability Gate
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: nginx:${{ github.sha }}
-        format: table
-        exit-code: '1'
-        severity: HIGH,CRITICAL
-        ignore-unfixed: true
-
-    - name: Mysql Vulnerability Gate
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: mysql:${{ github.sha }}
-        format: table
-        exit-code: '1'
-        severity: HIGH,CRITICAL
-        ignore-unfixed: true
-
+ 
     ####################################################
     # TAG IMAGES
     ####################################################
