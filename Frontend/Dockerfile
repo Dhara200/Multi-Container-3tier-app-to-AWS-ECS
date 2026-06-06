@@ -1,4 +1,4 @@
 FROM httpd:2.4
 
-COPY index.html \
+COPY Index.html \
 /usr/local/apache2/htdocs/index.html
