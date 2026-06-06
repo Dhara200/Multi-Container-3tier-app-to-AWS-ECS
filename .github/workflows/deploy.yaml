@@ -1,10 +1,12 @@
 name: Build Scan Push ECR
 
 on:
- workflow_dispatch
+  workflow_dispatch:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
 
 jobs:
   build-scan-push:
@@ -21,7 +23,6 @@ jobs:
         pwd
         ls -la
         ls -la Backend
-        ls -la Frontend
         ls -la Nginx
         ls -la Mysql
 
@@ -43,10 +44,6 @@ jobs:
     - name: Build Backend Image
       run: |
         docker build -t backend:${{ github.sha }} ./Backend
-
-    - name: Build Frontend Image
-      run: |
-        docker build -t frontend:${{ github.sha }} ./Frontend
 
     - name: Build Nginx Image
       run: |
@@ -74,25 +71,6 @@ jobs:
       with:
         name: backend-trivy-report
         path: backend-trivy-report.txt
-
-    ####################################################
-    # FRONTEND TRIVY
-    ####################################################
-
-    - name: Frontend Trivy Report
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: frontend:${{ github.sha }}
-        format: table
-        output: frontend-trivy-report.txt
-        severity: HIGH,CRITICAL
-        ignore-unfixed: true
-
-    - name: Upload Frontend Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: frontend-trivy-report
-        path: frontend-trivy-report.txt
 
     ####################################################
     # NGINX TRIVY
@@ -132,27 +110,21 @@ jobs:
         name: mysql-trivy-report
         path: mysql-trivy-report.txt
 
- 
     ####################################################
-    # TAG IMAGES AS LATEST
+    # TAG IMAGES
     ####################################################
 
-    - name: Tag Backend Latest
+    - name: Tag Backend
       run: |
         docker tag backend:${{ github.sha }} \
         ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
 
-    - name: Tag Frontend Latest
-      run: |
-        docker tag frontend:${{ github.sha }} \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:${{ github.sha }}
-
-    - name: Tag Nginx Latest
+    - name: Tag Nginx
       run: |
         docker tag nginx:${{ github.sha }} \
         ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
 
-    - name: Tag Mysql Latest
+    - name: Tag Mysql
       run: |
         docker tag mysql:${{ github.sha }} \
         ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:${{ github.sha }}
@@ -161,22 +133,17 @@ jobs:
     # PUSH TO ECR
     ####################################################
 
-    - name: Push Backend Latest
+    - name: Push Backend
       run: |
         docker push \
         ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
 
-    - name: Push Frontend Latest
-      run: |
-        docker push \
-        ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:${{ github.sha }}
-
-    - name: Push Nginx Latest
+    - name: Push Nginx
       run: |
         docker push \
         ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
 
-    - name: Push Mysql Latest
+    - name: Push Mysql
       run: |
         docker push \
         ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_MYSQL_REPO }}:${{ github.sha }}
@@ -188,6 +155,7 @@ jobs:
     ####################################################
     # GET TASK DEFINITION FROM ECS
     ####################################################
+
     - name: Get Task Definition from ECS
       run: |
         aws ecs describe-task-definition \
@@ -198,6 +166,7 @@ jobs:
     ####################################################
     # UPDATE ALL CONTAINERS IN TASK DEFINITION
     ####################################################
+
     - name: Render Backend
       id: backend
       uses: aws-actions/amazon-ecs-render-task-definition@v1
@@ -206,19 +175,11 @@ jobs:
         container-name: backend
         image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:${{ github.sha }}
 
-    - name: Render Frontend
-      id: frontend
-      uses: aws-actions/amazon-ecs-render-task-definition@v1
-      with:
-        task-definition: ${{ steps.backend.outputs.task-definition }}
-        container-name: frontend
-        image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:${{ github.sha }}
-
     - name: Render Nginx
       id: nginx
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
-        task-definition: ${{ steps.frontend.outputs.task-definition }}
+        task-definition: ${{ steps.backend.outputs.task-definition }}
         container-name: nginx
         image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_NGINX_REPO }}:${{ github.sha }}
 
@@ -233,6 +194,7 @@ jobs:
     ####################################################
     # DEPLOY TO ECS
     ####################################################
+
     - name: Deploy to ECS
       uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
@@ -244,5 +206,6 @@ jobs:
     ####################################################
     # SUCCESS
     ####################################################
+
     - name: Success Message
       run: echo "🚀 ECS Deployment Completed Successfully"
